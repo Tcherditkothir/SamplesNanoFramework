@@ -35,38 +35,39 @@ namespace Central2
 
         public static void Main()
         {
-            Console.WriteLine("Sample Client/Central 2 : Collect data from Environmental sensors");
-            Console.WriteLine("Searching for Environmental Sensors");
+            Console.WriteLine("Client d'échantillon/Central 2 : Collecte des données depuis des capteurs environnementaux");
+            Console.WriteLine("Recherche des capteurs environnementaux");
 
-            // Create a watcher
-            BluetoothLEAdvertisementWatcher watcher = new();
+            // Créer un observateur d'annonces
+            BluetoothLEAdvertisementWatcher watcher = new BluetoothLEAdvertisementWatcher();
             watcher.ScanningMode = BluetoothLEScanningMode.Active;
             watcher.Received += Watcher_Received;
 
+            // Le dispositif auquel nous allons nous connecter et communiquer.
+            BluetoothLEDevice connectedDevice = null;
+
             while (true)
             {
-                Console.WriteLine("Starting BluetoothLEAdvertisementWatcher");
+                Console.WriteLine("Démarrage du BluetoothLEAdvertisementWatcher");
                 watcher.Start();
 
-                // Run until we have found some devices to connect to
+                // Attendre jusqu'à ce que nous trouvions des dispositifs à connecter
                 while (s_foundDevices.Count == 0)
                 {
                     Thread.Sleep(10000);
                 }
+                Console.WriteLine("Arrêt du BluetoothLEAdvertisementWatcher");
+                watcher.Stop(); // Nous ne pouvons pas nous connecter si l'observateur est en cours d'exécution, donc l'arrêter.
 
-                Console.WriteLine("Stopping BluetoothLEAdvertisementWatcher");
+                Console.WriteLine($"Dispositifs trouvés {s_foundDevices.Count}");
+                Console.WriteLine("Connexion et lecture des capteurs");
 
-                // We can't connect if watch running so stop it.
-                watcher.Stop();
-
-                Console.WriteLine($"Devices found {s_foundDevices.Count}");
-                Console.WriteLine("Connecting and Reading Sensors");
-
+                // Itérer sur les dispositifs trouvés et se connecter à eux
                 foreach (DictionaryEntry entry in s_foundDevices)
                 {
                     BluetoothLEDevice device = entry.Value as BluetoothLEDevice;
 
-                    // Connect and register notify events
+                    // Essayer de se connecter et s'inscrire pour les notifications
                     if (ConnectAndRegister(device))
                     {
                         if (s_dataDevices.Contains(device.BluetoothAddress))
@@ -74,9 +75,40 @@ namespace Central2
                             s_dataDevices.Remove(device.BluetoothAddress);
                         }
                         s_dataDevices.Add(device.BluetoothAddress, device);
+
+                        // Nous gérons une seule connexion dans cet exemple, donc sauvegarder ce dispositif
+                        connectedDevice = device;
+
+                        // Envoyer les instructions initiales de vitesse et de direction
+                        WriteSpeedAndDirection(device, 25, 90);
+                        Console.WriteLine("Instructions initiales envoyées.");
+
+                        // Sortir de la boucle car nous voulons gérer une seule connexion
+                        break;
                     }
                 }
+
+                // Effacer la liste des dispositifs trouvés pour la prochaine période de publicité
                 s_foundDevices.Clear();
+
+                // Vérifier si nous nous sommes connectés avec succès à un dispositif
+                if (connectedDevice != null)
+                {
+                    // Tant que le dispositif est connecté, envoyer les instructions de vitesse et de direction
+                    while (connectedDevice.ConnectionStatus == BluetoothConnectionStatus.Connected)
+                    {
+                        WriteSpeedAndDirection(connectedDevice, 25, 90);
+                        Console.WriteLine("Instructions de vitesse et de direction envoyées.");
+
+                        // Attendre une période avant de renvoyer les instructions
+                        Thread.Sleep(1000);
+                    }
+
+                    // Si la connexion est perdue, l'enregistrer et nettoyer
+                    Console.WriteLine("Déconnecté du dispositif. Nettoyage en cours.");
+                    connectedDevice.Dispose();
+                    connectedDevice = null;
+                }
             }
         }
 
@@ -167,6 +199,35 @@ namespace Central2
             }
             return result;
         }
+
+        private static void WriteSpeedAndDirection(BluetoothLEDevice device, byte speed, byte direction)
+        {
+            // Obtention du service VehicleControlService par UUID
+            GattDeviceServicesResult servicesResult = device.GetGattServicesForUuid(new Guid("245463B4-38E9-43BD-90A7-6CE397CA9BCE"));
+            if (servicesResult.Status == GattCommunicationStatus.Success && servicesResult.Services.Length > 0)
+            {
+                GattDeviceService vehicleService = servicesResult.Services[0];
+
+                // Écriture sur la caractéristique de vitesse
+                WriteCharacteristic(vehicleService, new Guid("27BFA565-7FAE-4CFF-BE56-7AC3082B0E8D"), speed);
+
+                // Écriture sur la caractéristique de direction
+                WriteCharacteristic(vehicleService, new Guid("2F6343CE-E5BF-49F2-B189-07AB6EB6F168"), direction);
+            }
+        }
+
+        private static void WriteCharacteristic(GattDeviceService service, Guid characteristicUuid, byte value)
+        {
+            GattCharacteristicsResult charResult = service.GetCharacteristicsForUuid(characteristicUuid);
+            if (charResult.Status == GattCommunicationStatus.Success && charResult.Characteristics.Length > 0)
+            {
+                GattCharacteristic characteristic = charResult.Characteristics[0];
+                DataWriter writer = new DataWriter();
+                writer.WriteByte(value);
+                characteristic.WriteValueWithResult(writer.DetachBuffer());
+            }
+        }
+
 
         private static void Device_ConnectionStatusChanged(object sender, EventArgs e)
         {

@@ -24,6 +24,7 @@
     <Compile Include="Services\CurrentTimeService.cs" />
     <Compile Include="Services\DeviceInformationService.cs" />
     <Compile Include="Services\EnvironmentalSensorService.cs" />
+    <Compile Include="Services\VehiculeControlService.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
