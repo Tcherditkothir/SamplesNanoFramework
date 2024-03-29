@@ -15,42 +15,45 @@ namespace BluetoothLESample3
             {
             Console.WriteLine("Bonjour depuis Bluetooth Sample 3");
 
-                
+            // Création et initialisation de l'instance BluetoothLEServer pour le server (server = coté voiture, client = manette)                 
             BluetoothLEServer server = BluetoothLEServer.Instance;
             server.DeviceName = "Sample3";
-
+            
             Guid serviceUuid = new("A7EEDF2C-DA87-4CB5-A9C5-5151C78B0057");
             Guid readStaticCharUuid = new("A7EEDF2C-DA89-4CB5-A9C5-5151C78B0057");
 
+            // Initialize the VehicleControlService
+            VehicleControlService vehicleControlService = new VehicleControlService();
+
 
             GattServiceProviderResult result = GattServiceProvider.Create(serviceUuid);
-                if (result.Error != BluetoothError.Success)
-                {
-                    Console.WriteLine($"Erreur lors de la création du service principal : {result.Error}");
-                    return;
-                }
+            if (result.Error != BluetoothError.Success)
+            {
+                Console.WriteLine($"Erreur lors de la création du service principal : {result.Error}");
+                return;
+            }
 
-                GattServiceProvider serviceProvider = result.ServiceProvider;
-                GattLocalService service = serviceProvider.Service;
+            GattServiceProvider serviceProvider = result.ServiceProvider;
+            GattLocalService service = serviceProvider.Service;
 
-                DataWriter sw = new DataWriter();
+            DataWriter sw = new DataWriter();
                 sw.WriteString("Ceci est un exemple Bluetooth 3");
 
-                GattLocalCharacteristicResult characteristicResult = service.CreateCharacteristic(readStaticCharUuid,
-                    new GattLocalCharacteristicParameters()
-                    {
-                        CharacteristicProperties = GattCharacteristicProperties.Read,
-                        UserDescription = "Caractéristique statique",
-                        StaticValue = sw.DetachBuffer()
-                    });
-
-                if (characteristicResult.Error != BluetoothError.Success)
+            GattLocalCharacteristicResult characteristicResult = service.CreateCharacteristic(readStaticCharUuid,
+                new GattLocalCharacteristicParameters()
                 {
-                    Console.WriteLine($"Erreur lors de la création de la caractéristique statique : {characteristicResult.Error}");
-                    return;
-                }
+                    CharacteristicProperties = GattCharacteristicProperties.Read,
+                    UserDescription = "Caractéristique statique",
+                    StaticValue = sw.DetachBuffer()
+                });
 
-                DeviceInformationServiceService DifService = new("MyGreatCompany", "Model-1", null, "v1.0", SystemInfo.Version.ToString(), "");
+            if (characteristicResult.Error != BluetoothError.Success)
+            {
+                Console.WriteLine($"Erreur lors de la création de la caractéristique statique : {characteristicResult.Error}");
+                return;
+            }
+
+            DeviceInformationServiceService DifService = new("MyGreatCompany", "Model-1", null, "v1.0", SystemInfo.Version.ToString(), "");
                 BatteryService BatService = new() { BatteryLevel = 94 };
                 CurrentTimeService CtService = new(true);
                 EnvironmentalSensorService EnvService = new();
@@ -59,15 +62,16 @@ namespace BluetoothLESample3
                 EnvService.UpdateValue(iTempOut, 23.4F);
                 // ... autres capteurs ...
 
-                VehicleControlService vehicleControlService = new VehicleControlService();
-                Thread.Sleep(1000);
-                serviceProvider.StartAdvertising(new GattServiceProviderAdvertisingParameters()
-                {
-                    IsConnectable = true,
-                    IsDiscoverable = true
-                });
+           
 
-                Console.WriteLine("Publicité démarrée.");
+            // Start advertising the service with the GattServiceProvider instance
+            serviceProvider.StartAdvertising(new GattServiceProviderAdvertisingParameters
+            {
+                IsConnectable = true,
+                IsDiscoverable = true
+            });
+
+            Console.WriteLine("Publicité démarrée.");
 
                 // Simulation de la mise à jour des capteurs
                 SimulateSensorUpdates(EnvService);

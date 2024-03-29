@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using nanoFramework.Device.Bluetooth.GenericAttributeProfile;
 
 namespace nanoFramework.Device.Bluetooth.Services
@@ -53,6 +54,25 @@ namespace nanoFramework.Device.Bluetooth.Services
             }
             _directionCharacteristic = directionCharacteristicResult.Characteristic;
             _directionCharacteristic.WriteRequested += DirectionCharacteristic_WriteRequested;
+
+
+
+            // Create GattServiceProvider for VehicleControlService
+            GattServiceProviderResult result = GattServiceProvider.Create(vehicleControlServiceUuid);
+            if (result.Error != BluetoothError.Success)
+            {
+                Debug.WriteLine($"Unable to create GattServiceProvider: {result.Error}");
+                return;
+            }
+
+            // Get GattServiceProvider from result
+            GattServiceProvider serviceProvider = result.ServiceProvider;
+            // Commencez à faire de la publicité pour le service
+            serviceProvider.StartAdvertising(new GattServiceProviderAdvertisingParameters
+            {
+                IsConnectable = true,
+                IsDiscoverable = true
+            });
         }
 
         private void SpeedCharacteristic_WriteRequested(GattLocalCharacteristic sender, GattWriteRequestedEventArgs args)

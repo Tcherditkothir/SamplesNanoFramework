@@ -55,6 +55,7 @@ namespace Central2
                 while (s_foundDevices.Count == 0)
                 {
                     Thread.Sleep(10000);
+                    Console.WriteLine("Recherche...");
                 }
                 Console.WriteLine("Arrêt du BluetoothLEAdvertisementWatcher");
                 watcher.Stop(); // Nous ne pouvons pas nous connecter si l'observateur est en cours d'exécution, donc l'arrêter.
@@ -83,8 +84,8 @@ namespace Central2
                         WriteSpeedAndDirection(device, 25, 90);
                         Console.WriteLine("Instructions initiales envoyées.");
 
-                        // Sortir de la boucle car nous voulons gérer une seule connexion
-                        break;
+                        // Sortir de la boucle (foreach) car nous voulons gérer une seule connexion
+                        //break;
                     }
                 }
 
@@ -97,11 +98,18 @@ namespace Central2
                     // Tant que le dispositif est connecté, envoyer les instructions de vitesse et de direction
                     while (connectedDevice.ConnectionStatus == BluetoothConnectionStatus.Connected)
                     {
-                        WriteSpeedAndDirection(connectedDevice, 25, 90);
-                        Console.WriteLine("Instructions de vitesse et de direction envoyées.");
+                        int i = 0;
+                        if (i > 32000)
+                        {
+                            WriteSpeedAndDirection(connectedDevice, 25, 90);
+                            i = 0;
+                            Console.WriteLine("Instructions de vitesse et de direction envoyées.");
+                        }
+                        else
+                        { i++; }
 
                         // Attendre une période avant de renvoyer les instructions
-                        Thread.Sleep(1000);
+                        //Thread.Sleep(1000);
                     }
 
                     // Si la connexion est perdue, l'enregistrer et nettoyer
@@ -112,25 +120,25 @@ namespace Central2
             }
         }
 
-        /// <summary>
         /// Check for device with correct Service UUID in advert and not already found
-        /// </summary>
-        /// <param name="args"></param>
-        /// <returns></returns>
         private static bool IsValidDevice(BluetoothLEAdvertisementReceivedEventArgs args)
         {
-            if (args.Advertisement.ServiceUuids.Length > 0 &&
-                args.Advertisement.ServiceUuids[0].Equals(new Guid("A7EEDF2C-DA87-4CB5-A9C5-5151C78B0057")))
+            // Check if any of the advertised service UUIDs match the VehicleControlService UUID
+            foreach (var uuid in args.Advertisement.ServiceUuids)
             {
-                if (!s_foundDevices.Contains(args.BluetoothAddress))
+                Console.WriteLine("Checking UUID...");
+                if (uuid.Equals(new Guid("245463B4-38E9-43BD-90A7-6CE397CA9BCE")))
                 {
-                    return true;
+                    if (!s_foundDevices.Contains(args.BluetoothAddress))
+                    {
+                        return true;
+                    }
                 }
             }
-
             return false;
         }
 
+        // A7EEDF2C-DA87-4CB5-A9C5-5151C78B0057
         private static void Watcher_Received(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
         {
             // Print information about received advertisement
